@@ -48,7 +48,6 @@ int main( void )
             buttonValue = !buttonValue;
             // Escribir el valor leido en el LED correspondiente.
             gpioWrite( CIAA_BOARD_LED, buttonValue );
-
             /* Enviar a la salida estandar (UART_DEBUG) el estado del LED */
             
             // Leer el estado del pin conectado al led
