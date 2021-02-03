@@ -35,7 +35,7 @@ int main( void )
       
       timeCount++;      
       
-      if( timeCount == 100 ){ // 100ms * 100 = 10s
+      if( timeCount == 100 ) { // 100ms * 100 = 10s
          
          while( TRUE ) {
             

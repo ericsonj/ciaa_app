@@ -1,5 +1,8 @@
 import json
 import os
+from pathlib import Path
+
+GDB_PATH = "/opt/gcc-arm-none-eabi-8-2018-q4-major/bin/arm-none-eabi-gdb"
 
 def vscodeGen_c_cpp_properties(projSett, compSett):
     """
@@ -52,24 +55,18 @@ def vscodeGen_launch(projSett, compSett):
         "version": "0.2.0",
         "configurations": [
             {
-                "name": "(gdb) Launch",
-                "type": "cppdbg",
-                "request": "launch",
-                "program": "${workspaceFolder}/" + str(outputFile),
-                "args": [],
-                "stopAtEntry": False,
-                "cwd": "${workspaceFolder}",
-                "environment": [],
-                "console": "externalTerminal",
-                "MIMode": "gdb",
-                "setupCommands": [
-                    {
-                        "description": "Enable pretty-printing for gdb",
-                        "text": "-enable-pretty-printing",
-                        "ignoreFailures": True
-                    }
-                ]
-            }
+            "type": "cortex-debug",
+            "request": "launch",
+            "name": "Debug (OpenOCD)",
+            "servertype": "openocd",
+            "cwd": "${workspaceRoot}",
+            "runToMain": True,
+            "executable": "Release/ciaa_app/ciaa_app.elf",
+            "configFiles": [
+                "/PROJECTS/ARM/firmware_v3/scripts/openocd/lpc4337_new.cfg"
+            ],
+            "gdbPath": GDB_PATH
+        }
         ]
     }
 
@@ -86,4 +83,7 @@ def vscode_init(projSett, compSett):
     # print(projSett) 
     # print(compSett)
     vscodeGen_c_cpp_properties(projSett, compSett)
+    if not Path(GDB_PATH).exists():
+        print("***GDB not found, edit GDB_PATH in vscode_addon.py")
+        return
     vscodeGen_launch(projSett, compSett)
