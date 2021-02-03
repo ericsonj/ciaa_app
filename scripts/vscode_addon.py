@@ -22,7 +22,7 @@ def vscodeGen_c_cpp_properties(projSett, compSett):
                 'name': 'gcc',
                 'defines': defines,
                 "compilerPath": compSett['CC'],
-                "intelliSenseMode": "linux-gcc-x86",
+                "intelliSenseMode": "linux-gcc-arm",
                 "cStandard": "gnu11",
                 "cppStandard": "c++17",
                 "includePath": projSett['C_INCLUDES'],
