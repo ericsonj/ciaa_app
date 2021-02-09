@@ -4,8 +4,16 @@ import re
 import argparse
 import sys
 from pathlib import Path
+import gi
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk
 
 usingColor = False
+
+class Handler:
+    def onDestroy(self, *args):
+        Gtk.main_quit()
 
 def toKB(num):
     if num < 1024:
@@ -223,6 +231,7 @@ for regin in content:
     except:
         pass
 
+regions.sort(key=lambda x: x.origin, reverse=False)
 
 for r in regions:
     for s in sections:
@@ -234,46 +243,81 @@ for r in regions:
 symbols = []
 if args.symbolsfile:
     symbfile = open(args.symbolsfile)
-    regex = r".*:(?P<addr>[0-9a-f]+)[ ]+(?P<size>[0-9a-f]+)[ ]+(?P<type>[a-zA-Z]+)[ ]+(?P<name>[a-zA-Z0-9_-]+)[ ]*(?P<linenum>.*$)"
+    regex = r".*:(?P<addr>[0-9a-f]+)[ ]*(?P<size>[0-9a-f]*)[ ]+(?P<type>[a-zA-Z]+)[ ]+(?P<name>[a-zA-Z0-9_-]+)[ ]*(?P<linenum>.*$)"
     for l in symbfile:
         match = re.search(regex, l)
         if match:
             symbols.append(
                 Symbol(
                     match.group('addr'),
-                    match.group('size'),
+                    0 if not match.group('size') else match.group('size'),
                     match.group('type'),
                     match.group('name'),
                     match.group('linenum')
                 )
             )
 
+symbols.sort(key=lambda x: x.addr, reverse=False)
+
 if args.all:
+
+    builder = Gtk.Builder()
+    builder.add_from_file("pybagui.glade")
+    builder.connect_signals(Handler())
+
+    store = Gtk.TreeStore(str, str, str, str)
     for r in regions:
         print("{0} {1}".format(r.name, r.using))
+        treeitem = store.append(None, [r.name, hex(r.origin), "", str(r.using)])
         count = 0
         for s in sections:
-            if ( (s.addr >= r.origin and s.addr < r.end and s.length > 0) or (s.name == '.data' and (s.loadAddr >= r.origin and s.loadAddr < r.end))):
+            if ( (s.addr >= r.origin and s.addr < r.end) or (s.name == '.data' and (s.loadAddr >= r.origin and s.loadAddr < r.end))):
+                treeitemsub = store.append(treeitem, [s.name, hex(s.addr), hex(s.loadAddr), str(s.length)])
                 print("\t{0:16} {1} {2} {3}".format(s.name, hex(s.addr), hex(s.loadAddr), s.length))
                 for sym in symbols:
-                    if (sym.addr >= r.origin and sym.addr < r.end and s.name == '.text' and (sym.type == 't' or sym.type == 'T')):
+                    if (sym.addr >= r.origin and sym.addr < r.end and s.name == '.text' and (sym.type == 't' or sym.type == 'T' or sym.type == 'w' or sym.type == 'W')):
+                        store.append(treeitemsub, [sym.name, hex(sym.addr), "", str(sym.size)])
                         print("\t\t{0:40} {1:4} {2} {3}".format(sym.name, sym.size, sym.type, hex(sym.addr)))
                     elif (sym.addr >= r.origin and sym.addr < r.end and s.name == '.bss' and (sym.type == 'b' or sym.type == 'B')):
+                        store.append(treeitemsub, [sym.name, hex(sym.addr), "", str(sym.size)])
                         print("\t\t{0:40} {1:4} {2} {3}".format(sym.name, sym.size, sym.type, hex(sym.addr)))
                     elif (s.name == '.data'):
                         if (sym.addr >= s.addr and sym.addr < (s.addr + s.length) and (sym.type == 'd' or sym.type == 'D')):
+                            store.append(treeitemsub, [sym.name, hex(sym.addr), "", str(sym.size)])
                             print("\t\t{0:40} {1:4} {2} {3}".format(sym.name, sym.size, sym.type, hex(sym.addr)))
+                    elif (sym.addr >= r.origin and sym.addr < r.end and s.name == '.rodata' and (sym.type == 'r' or sym.type == 'R')):
+                        store.append(treeitemsub, [sym.name, hex(sym.addr), "", str(sym.size)])
+                        print("\t\t{0:40} {1:4} {2} {3}".format(sym.name, sym.size, sym.type, hex(sym.addr)))
+                    elif (sym.addr >= s.addr and sym.addr < (s.addr + s.length) and sym.size > 0 and (sym.type == 'd' or sym.type == 'D' or sym.type == 'b' or sym.type == 'B')):
+                        store.append(treeitemsub, [sym.name, hex(sym.addr), "", str(sym.size)])
+                        print("\t\t{0:40} {1:4} {2} {3}".format(sym.name, sym.size, sym.type, hex(sym.addr)))
 
-                # elif (s.name == ".data" and (sym.type == 'd' or sym.type == 'D') and ((s.loadAddr >= r.origin and s.loadAddr < r.end) or (sym.addr >= s.addr and sym.addr < (s.addr + s.length)))):
-                #     print("\t\t{0:40} {1:4} {2} {3}".format(sym.name, sym.size, sym.type, hex(sym.addr)))
+    
+    treeView = builder.get_object("treeView")
+    treeView.set_model(store)
+    
+    headers = [
+        'Name',
+        'Run address',
+        'Load address',
+        'Size'
+    ]
 
-        # for sym in symbols:
-        #     if (sym.addr >= r.origin and sym.addr < r.end):
-        #         count += sym.size
-        #         print("\t\t{0:32} {1:4} {2}".format(sym.name, sym.size, sym.type))
+    idx = 0
+    for h in headers:
+        renderer = Gtk.CellRendererText()
+        column = Gtk.TreeViewColumn(h, renderer, text=idx)
+        treeView.append_column(column)
+        idx+=1
 
-        print("\tTotal: {0}".format(count))
+    treeView.expand_all()
 
+    window = builder.get_object("window1")
+    window.show_all()
+
+    Gtk.main()
+
+else:
     print(MemRegion.PRINT_FORMAT.format('Region', 'Start', 'End', 'Size', 'Free', 'Used', '', 'Usage(%)'))
     for r in regions:
         print(r.printStats())
