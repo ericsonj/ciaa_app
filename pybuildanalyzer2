@@ -6,9 +6,12 @@ import subprocess
 import argparse
 from pathlib import Path
 import json
+import gi
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk
 
 # ---------------------
-
 class SectionHeader:
     def __init__(self, args):
         self.nr   = args['nr']
@@ -19,14 +22,102 @@ class SectionHeader:
         self.size = int("0x"+args['size'], 16)
         self.es   = args['es']
         self.flg  = args['flg']
-        self.lk   = args['lk']
-        self.inf  = args['inf']
-        self.al   = args['al']
+        self.lk   = int(args['lk'])
+        self.inf  = int(args['inf'])
+        self.al   = int(args['al'])
+        self.load_addr = 0
+        self.symbols = []
+
+    def setLoadAddr(self, load_addr):
+        self.load_addr = load_addr
+    
+    def toJSON(self):
+        return json.dumps(self, default=lambda x: x.__dict__, indent=4)
+
     def __repr__(self) -> str:
         return json.dumps(self.__dict__)
 
-# ----------------------
 
+class SectionMap:
+    def __init__(self, name, addr, length, loadAddr=0):
+        self.name = name
+        self.addr = addr
+        self.loadAddr = loadAddr
+        self.length = length
+    def __repr__(self) -> str:
+        return json.dumps(self.__dict__)
+
+class Symbol:
+    def __init__(self, args):
+        self.num    = int(args['num'])
+        self.value  = int("0x"+args['addr'], 16)
+        self.addr   = self.value
+        self.size   = int(args['size'])
+        self.type   = args['type']
+        self.bind   = args['bind']
+        self.vis    = args['vis']
+        self.ndx    = args['ndx']
+        self.name   = args['name']
+    def __repr__(self) -> str:
+        return json.dumps(self.__dict__)
+
+class MemRegion:
+    def __init__(self, name, attr, origin, length):
+        self.name = name
+        self.attr = attr
+        self.origin = origin
+        self.length = length
+        self.end = origin + length
+        self.using = 0
+        self.sections = []
+    def __repr__(self) -> str:
+        return json.dumps(self.__dict__, default=lambda x: x.__dict__)
+    def toJSON(self):
+        return json.dumps(self, default=lambda x: x.__dict__, indent=4)
+
+class Handler:
+    def onDestroy(self, *args):
+        Gtk.main_quit()
+
+class GtkRegionsWin:
+    def __init__(self, regions:list, gladefile):
+        self.regions = regions
+        self.gladefile = gladefile
+
+    def getGtkTreeStore(self):
+        store = Gtk.TreeStore(str, str, str, str)
+        for r in self.regions:
+            region_node = store.append(None, [r.name, hex(r.origin), "", str(r.using)])
+            for sec in r.sections:
+                section_node = store.append(region_node, [sec.name, hex(sec.addr), "", str(sec.size)])
+                for sym in sec.symbols:
+                    store.append(section_node, [sym.name, hex(sym.addr), "", str(sym.size)])
+        return store
+
+    def show(self):
+        builder = Gtk.Builder()
+        builder.add_from_file(self.gladefile)
+        builder.connect_signals(Handler())
+        treeView = builder.get_object("treeView")
+        treeView.set_model(self.getGtkTreeStore())
+        headers = [
+            'Name',
+            'Run address',
+            'Load address',
+            'Size'
+        ]
+        idx = 0
+        for h in headers:
+            renderer = Gtk.CellRendererText()
+            column = Gtk.TreeViewColumn(h, renderer, text=idx)
+            treeView.append_column(column)
+            idx+=1
+        treeView.expand_all()
+        window = builder.get_object("window1")
+        window.show_all()
+        Gtk.main()
+
+# ----------------------
 
 parser = argparse.ArgumentParser(description='Builder Analyzer for ARM firmware')
 parser.add_argument('elf', type=str, help='ELF file')
@@ -45,12 +136,139 @@ mapfile = elffile.replace(".elf", ".map")
 if not Path(mapfile).exists():
     mapfile = None
 
-result = subprocess.run([readelf, '-S', elffile], stdout=subprocess.PIPE).stdout.splitlines()
-
+result = subprocess.run([readelf, '-S', '--wide', elffile], stdout=subprocess.PIPE).stdout.splitlines()
+sections = []
 rgx_section_h = r"^\s*\[[ ]*(?P<nr>[0-9]+)\][ ]+(?P<name>[a-zA-Z\\.0-9_-]+)[ ]+(?P<type>[a-zA-Z\\.0-9_-]+)[ ]+(?P<addr>[a-f0-9]+)[ ]+(?P<off>[a-f0-9]+)[ ]+(?P<size>[a-f0-9]+)[ ]+(?P<es>[a-f0-9]{2})[ ]+(?P<flg>[a-zA-Z]*)[ ]+(?P<lk>[0-9]+)[ ]+(?P<inf>[0-9]+)[ ]+(?P<al>[0-9]+)"
 for line in result:
     l = line.decode("utf-8")
     match = re.search(rgx_section_h, l)
     if match:
         s = SectionHeader(match.groupdict())
-        print(s)
+        sections.append(s)
+
+result = subprocess.run([readelf, '-s', '--wide', elffile], stdout=subprocess.PIPE).stdout.splitlines()
+symbols = []
+rgx_symbols = r"^\s+(?P<num>[0-9]+):[ ]+(?P<addr>[a-f0-9]+)[ ]+(?P<size>[a-f0-9]+)[ ]+(?P<type>[a-zA-Z0-9]+)[ ]+(?P<bind>[a-zA-Z0-9]+)[ ]+(?P<vis>[a-zA-Z0-9]+)[ ]+(?P<ndx>[a-zA-Z0-9]+)[ ]?(?P<name>[a-zA-Z\\.\\$0-9_-]*)"
+for line in result:
+    l = line.decode("utf-8")
+    match = re.search(rgx_symbols, l)
+    if match:
+        s = Symbol(match.groupdict())
+        symbols.append(s)
+
+symbols.sort(key=lambda x: x.addr, reverse=False)
+
+regions = []
+sectionsMap = []
+if mapfile:
+    memlines = False
+    memNewLines = 2
+    maplines = False
+    mapNewLines = 2
+    readStackSize = False
+    mapfile = open(mapfile, 'r')
+    content = []
+    readNextLine = False
+    upstream = []
+    for line in mapfile:
+        if (re.match(r'^Memory Configuration', line)):
+            memlines = True
+
+        if memlines:
+            if (line.strip() == ''):
+                memNewLines = memNewLines - 1
+            if memNewLines == 0:
+                memlines = False
+            line = line.strip()
+            line = re.sub(r'\s+', ' ', line)
+            content.append(line)
+
+        if re.match(r'^[.].*', line):
+            if not ' ' in line.strip():
+                readNextLine = True
+            upstream.append(line.strip())
+        else:
+            if readNextLine:
+                upstream[-1] = upstream[-1] + ' ' + line.strip()
+                readNextLine = False
+    mapfile.close()
+
+    p = re.compile(r'^[.][a-zA-Z\\.0-9_-]+\s+0x[0-9a-fA-F]+\s+0x[0-9a-fA-F]+.*')
+    upstream = list(filter(p.search, upstream))
+    lines = upstream
+    p = re.compile(
+        r'^(?P<name>[.][a-z-A-Z\\.0-9_-]+)\s+(?P<addr>[0-9xa-fA-F]+)+\s+(?P<length>[0-9xa-fA-F]+).*')
+    p2 = re.compile(
+        r'^(?P<name>[.][a-z-A-Z\\.0-9_-]+)\s+(?P<addr>[0-9xa-fA-F]+)+\s+(?P<length>[0-9xa-fA-F]+)\s+load\s+address\s+(?P<load_addr>[0-9xa-fA-F]+).*')
+    for l in lines:
+        m = None
+        loadAddr = 0
+        if 'load' in l:
+            m = p2.search(l)
+            loadAddr = int(m.group('load_addr'), 16)
+        else:
+            m = p.search(l)
+
+        if m:
+            name = m.group('name')
+            addr = int(m.group('addr'), 16)
+            length = int(m.group('length'), 16)
+            sectionsMap.append(SectionMap(name, addr, length, loadAddr))
+
+    for line in content:
+        if re.match(r'^Memory Configuration', line):
+            content.remove(line)
+        elif re.match(r'^Name\s+Origin\s+Length\s+Attributes', line):
+            content.remove(line)
+        elif re.match(r'^[*]default[*].*', line):
+            content.remove(line)
+
+    for regin in content:
+        values = regin.split(' ')
+        try:
+            regions.append(MemRegion(
+                name=values[0],
+                attr=values[3],
+                origin=int(values[1], 16),
+                length=int(values[2], 16)
+            ))
+        except:
+            pass
+    regions.sort(key=lambda x: x.origin, reverse=False)
+
+# ------------------------------- 
+
+for sec in sections:
+    if sec.size > 0 and sec.addr > 0:
+        syms = list(filter(lambda x: x.ndx == sec.nr and x.size > 0, symbols))
+        if syms:
+            sec.symbols.extend(syms)
+
+if regions and sectionsMap:
+    sectionsMap = list(filter(lambda x: x.addr > 0 and x.length > 0 and x.loadAddr > 0 and x.name != '.bss', sectionsMap))
+    print(sectionsMap)
+    for s in sectionsMap:
+        for sec in sections:
+            if (sec.name == s.name):
+                sec.setLoadAddr(s.loadAddr)
+
+    for r in regions:
+        for sec in sections:
+            if sec.size > 0 and sec.addr > 0:
+                if (sec.addr >= r.origin and sec.addr < r.end) or (sec.load_addr > 0 and (sec.load_addr >= r.origin and sec.load_addr < r.end)):
+                    r.sections.append(sec)
+
+    # print('[')
+    # for r in regions:
+    #     print(r.toJSON()+",")
+    # print(']')
+
+    win = GtkRegionsWin(regions, "pybagui.glade")
+    win.show()
+
+else:
+    print('[')
+    for sec in sections:
+        if sec.size > 0 and sec.addr > 0:
+            print(sec.toJSON()+",")
+    print(']')
