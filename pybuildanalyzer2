@@ -75,31 +75,30 @@ class MemRegion:
     def toJSON(self):
         return json.dumps(self, default=lambda x: x.__dict__, indent=4)
 
-class Handler:
-    def onDestroy(self, *args):
-        Gtk.main_quit()
-
 class GtkRegionsWin:
     def __init__(self, regions:list, gladefile):
         self.regions = regions
         self.gladefile = gladefile
 
-    def getGtkTreeStore(self):
+    def getGtkTreeStore(self, search=r'a-zA-Z\\.0-9_-'):
         store = Gtk.TreeStore(str, str, str, str)
         for r in self.regions:
             region_node = store.append(None, [r.name, hex(r.origin), "", str(r.using)])
             for sec in r.sections:
                 section_node = store.append(region_node, [sec.name, hex(sec.addr), "", str(sec.size)])
                 for sym in sec.symbols:
-                    store.append(section_node, [sym.name, hex(sym.addr), "", str(sym.size)])
+                    if re.search(search, sym.name):
+                        store.append(section_node, [sym.name, hex(sym.addr), "", str(sym.size)])
         return store
 
     def show(self):
         builder = Gtk.Builder()
         builder.add_from_file(self.gladefile)
-        builder.connect_signals(Handler())
-        treeView = builder.get_object("treeView")
-        treeView.set_model(self.getGtkTreeStore())
+
+        self.treeView = builder.get_object("treeView")
+        self.treeView.set_model(self.getGtkTreeStore())
+        self.treeView.set_reorderable(False)
+        self.treeView.set_search_column(0)
         headers = [
             'Name',
             'Run address',
@@ -108,14 +107,28 @@ class GtkRegionsWin:
         ]
         idx = 0
         for h in headers:
-            renderer = Gtk.CellRendererText()
-            column = Gtk.TreeViewColumn(h, renderer, text=idx)
-            treeView.append_column(column)
+            renderer_editabletext = Gtk.CellRendererText()
+            renderer_editabletext.set_property("editable", True)
+            column_editabletext = Gtk.TreeViewColumn(
+                h, renderer_editabletext, text=idx
+            )
+            self.treeView.append_column(column_editabletext)
             idx+=1
-        treeView.expand_all()
+
+        entrySearch = builder.get_object("entrySearch")
+        entrySearch.connect("changed", self.searchChanged)
+        self.treeView.set_search_entry(entrySearch)
+
+        # treeView.expand_all()
         window = builder.get_object("window1")
+        window.connect("destroy", Gtk.main_quit)
         window.show_all()
         Gtk.main()
+
+    def searchChanged(self, nip):
+        print(nip.get_text())
+        self.treeView.set_model(self.getGtkTreeStore(search=nip.get_text()))
+        self.treeView.expand_all()
 
 # ----------------------
 
