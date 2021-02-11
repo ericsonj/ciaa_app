@@ -12,6 +12,12 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 
 # ---------------------
+
+def toKB(num):
+    if num < 1024:
+        return '{} B'.format(num)
+    return '{:.2f} KB'.format(num/1024)
+
 class SectionHeader:
     def __init__(self, args):
         self.nr   = args['nr']
@@ -79,24 +85,82 @@ class GtkRegionsWin:
     def __init__(self, regions:list, gladefile):
         self.regions = regions
         self.gladefile = gladefile
+        self.current_filter = None
 
-    def getGtkTreeStore(self, search=r'a-zA-Z\\.0-9_-'):
-        store = Gtk.TreeStore(str, str, str, str)
-        for r in self.regions:
-            region_node = store.append(None, [r.name, hex(r.origin), "", str(r.using)])
-            for sec in r.sections:
-                section_node = store.append(region_node, [sec.name, hex(sec.addr), "", str(sec.size)])
-                for sym in sec.symbols:
-                    if re.search(search, sym.name):
-                        store.append(section_node, [sym.name, hex(sym.addr), "", str(sym.size)])
-        return store
+    def getSectionRow(self, sec):
+        row = []
+        row.append(sec.name)
+        row.append("{0:#0{1}x}".format(sec.addr,10))
+        if sec.load_addr > 0:
+            row.append("{0:#0{1}x}".format(sec.load_addr,10))
+        else:
+            row.append("")
+        row.append(toKB(sec.size))
+        return row
+
+    def getRegionRow(self, r):
+        row = []
+        row.append(r.name)
+        row.append("{0:#0{1}x}".format(r.origin,10))
+        row.append("")
+        row.append(toKB(r.length))
+        return row
+
+    def getSymbolRow(self, sec, sym):
+        row = []
+        row.append(sym.name)
+        row.append("{0:#0{1}x}".format(sym.addr,10))
+        if sec.load_addr > 0:
+            diff = (sym.addr - sec.addr)
+            loadAddr = sec.load_addr + diff
+            row.append("{0:#0{1}x}".format(loadAddr,10))
+        else:
+            row.append("")
+        row.append(toKB(sym.size))
+        return row
+
+    def getGtkTreeStore(self, search=None):
+        self.store = Gtk.TreeStore(str, str, str, str)
+        if not search:  
+            for r in self.regions:
+                region_node = self.store.append(None, self.getRegionRow(r))
+                for sec in r.sections:
+                    section_node = self.store.append(region_node, self.getSectionRow(sec))
+                    for sym in sec.symbols:
+                        self.store.append(section_node, self.getSymbolRow(sec, sym))
+            return self.store
+        else:
+            regex = f"[{0}]".format(search)
+            for r in self.regions:
+                region_node = self.store.append(None, self.getRegionRow(r))
+                matchsec = False
+                for sec in r.sections:
+                    matchname = False
+                    matches = []
+
+                    for sym in sec.symbols:
+                        if sym.name.startswith(search) or sec.name.startswith(search):
+                            matchname = True
+                            matches.append(sym)
+
+                    if sec.name.startswith(search):
+                        matchname = True
+
+                    if matchname:
+                        matchsec = True
+                        section_node = self.store.append(region_node, self.getSectionRow(sec))
+                        for sym in matches:
+                            self.store.append(section_node, self.getSymbolRow(sec, sym))
+                if not matchsec:
+                    self.store.remove(region_node)
+            return self.store
 
     def show(self):
         builder = Gtk.Builder()
         builder.add_from_file(self.gladefile)
 
         self.treeView = builder.get_object("treeView")
-        self.treeView.set_model(self.getGtkTreeStore())
+        
         self.treeView.set_reorderable(False)
         self.treeView.set_search_column(0)
         headers = [
@@ -119,15 +183,45 @@ class GtkRegionsWin:
         entrySearch.connect("changed", self.searchChanged)
         self.treeView.set_search_entry(entrySearch)
 
+        # self.filter = self.getGtkTreeStore().filter_new()
+        # # self.filter.set_visible_column(1)
+        # self.filter.set_visible_func(self.filter_func)
+        self.treeView.set_model(self.getGtkTreeStore())
+
         # treeView.expand_all()
         window = builder.get_object("window1")
+        window.set_size_request(800, 600)
         window.connect("destroy", Gtk.main_quit)
         window.show_all()
         Gtk.main()
 
+    # def filter_func(self, model, iter, data):
+    #     if (
+    #         self.current_filter is None
+    #         or self.current_filter == "None"
+    #     ):
+    #         return True
+    #     else:
+    #         colname = str(model[iter][0])
+    #         print(colname)
+    #         print(self.current_filter)
+    #         if any(x.name == colname for x in self.regions):
+    #             return True
+    #         for r in self.regions:
+    #             if any(x.name == colname for x in r.sections):
+    #                 return True
+
+    #         val = str(model[iter][0]) == self.current_filter
+    #         print(val)
+    #         return val
+
     def searchChanged(self, nip):
-        print(nip.get_text())
-        self.treeView.set_model(self.getGtkTreeStore(search=nip.get_text()))
+        if not nip.get_text():
+            self.current_filter = None
+        else:
+            self.current_filter = nip.get_text()
+        # self.filter.refilter()
+        self.treeView.set_model(self.getGtkTreeStore(search=self.current_filter))
         self.treeView.expand_all()
 
 # ----------------------
