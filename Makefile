@@ -32,7 +32,7 @@
 	@time -p $(MAKE) -f makefile.mk $@
 
 prebuild:
-	@pymaketool $(or $(MAKECMDGOALS),all)
+	@./pymaketool/scripts/pymaketool $(or $(MAKECMDGOALS),all)
 
 .PHONY: test
 test_%:

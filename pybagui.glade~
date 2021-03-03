@@ -40,9 +40,6 @@
                   <object class="GtkTreeSelection"/>
                 </child>
               </object>
-              <packing>
-                <property name="tab_fill">False</property>
-              </packing>
             </child>
             <child type="tab">
               <object class="GtkLabel">

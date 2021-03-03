@@ -25,3 +25,9 @@ def init(mh: ModuleHandle):
     except Exception as e:
             print(e)
     return staticLib
+
+def getSrcs(m):
+    return None
+
+def getIncs(m):
+    return None

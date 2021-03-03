@@ -6,6 +6,7 @@ import subprocess
 import argparse
 from pathlib import Path
 import json
+from typing import Text
 import gi
 
 gi.require_version("Gtk", "3.0")
@@ -98,6 +99,19 @@ class GtkRegionsWin:
         row.append(toKB(sec.size))
         return row
 
+    def getMemRegionRow(self, r):
+        row = []
+        row.append(r.name)
+        row.append("{0:#0{1}x}".format(r.origin,10))
+        row.append("{0:#0{1}x}".format(r.end,10))
+        row.append(toKB(r.length))
+        row.append(toKB(r.length-r.using))
+        row.append(toKB(r.using))
+        row.append((r.using/r.length)*100)
+        row.append('')
+        row.append('{:.2f}%'.format((r.using/r.length)*100))
+        return row
+
     def getRegionRow(self, r):
         row = []
         row.append(r.name)
@@ -155,12 +169,53 @@ class GtkRegionsWin:
                     self.store.remove(region_node)
             return self.store
 
+    def getGtkRegionsModel(self):
+        store = Gtk.ListStore(str, str, str, str, str, str, float, str, str)
+        for r in self.regions:
+            store.append(self.getMemRegionRow(r))
+        return store
+
     def show(self):
         builder = Gtk.Builder()
         builder.add_from_file(self.gladefile)
 
-        self.treeView = builder.get_object("treeView")
+#       Memory Regios
+        self.tvregios = builder.get_object("tvRegions")
+        headers = [
+            'Region',
+            'Start Address',
+            'End Address',
+            'Size',
+            'Free',
+            'Used'
+        ]
+        idx = 0
+        for h in headers:
+            renderer_editabletext = Gtk.CellRendererText()
+            renderer_editabletext.set_property("editable", True)
+            column_editabletext = Gtk.TreeViewColumn(
+                h, renderer_editabletext, text=idx
+            )
+            self.tvregios.append_column(column_editabletext)
+            idx+=1
+
+        renderer_progress = Gtk.CellRendererProgress()
+        renderer_progress.set_fixed_size(200,20)
+        column_progress = Gtk.TreeViewColumn(
+            "Using", renderer_progress, value=idx, inverted=2, text=(idx+2)
+        )
+        self.tvregios.append_column(column_progress)
+        idx+=1
+
+        renderer_text = Gtk.CellRendererText()
+        column_text = Gtk.TreeViewColumn("", renderer_text, text=idx)
+        self.tvregios.append_column(column_text)
+
+        self.tvregios.set_model(self.getGtkRegionsModel())
         
+
+#       Memory Details
+        self.treeView = builder.get_object("treeView")
         self.treeView.set_reorderable(False)
         self.treeView.set_search_column(0)
         headers = [
@@ -183,37 +238,15 @@ class GtkRegionsWin:
         entrySearch.connect("changed", self.searchChanged)
         self.treeView.set_search_entry(entrySearch)
 
-        # self.filter = self.getGtkTreeStore().filter_new()
-        # # self.filter.set_visible_column(1)
-        # self.filter.set_visible_func(self.filter_func)
         self.treeView.set_model(self.getGtkTreeStore())
+        self.treeView.expand_all()
 
-        # treeView.expand_all()
         window = builder.get_object("window1")
         window.set_size_request(800, 600)
         window.connect("destroy", Gtk.main_quit)
         window.show_all()
         Gtk.main()
 
-    # def filter_func(self, model, iter, data):
-    #     if (
-    #         self.current_filter is None
-    #         or self.current_filter == "None"
-    #     ):
-    #         return True
-    #     else:
-    #         colname = str(model[iter][0])
-    #         print(colname)
-    #         print(self.current_filter)
-    #         if any(x.name == colname for x in self.regions):
-    #             return True
-    #         for r in self.regions:
-    #             if any(x.name == colname for x in r.sections):
-    #                 return True
-
-    #         val = str(model[iter][0]) == self.current_filter
-    #         print(val)
-    #         return val
 
     def searchChanged(self, nip):
         if not nip.get_text():
@@ -353,7 +386,6 @@ for sec in sections:
 
 if regions and sectionsMap:
     sectionsMap = list(filter(lambda x: x.addr > 0 and x.length > 0 and x.loadAddr > 0 and x.name != '.bss', sectionsMap))
-    print(sectionsMap)
     for s in sectionsMap:
         for sec in sections:
             if (sec.name == s.name):
@@ -363,6 +395,7 @@ if regions and sectionsMap:
         for sec in sections:
             if sec.size > 0 and sec.addr > 0:
                 if (sec.addr >= r.origin and sec.addr < r.end) or (sec.load_addr > 0 and (sec.load_addr >= r.origin and sec.load_addr < r.end)):
+                    r.using += sec.size
                     r.sections.append(sec)
 
     # print('[')
