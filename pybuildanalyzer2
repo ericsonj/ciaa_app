@@ -89,52 +89,88 @@ class GtkRegionsWin:
         self.current_filter = None
 
     def getSectionRow(self, sec):
-        row = []
-        row.append(sec.name)
-        row.append("{0:#0{1}x}".format(sec.addr,10))
+        auxrow = []
+        auxrow.append([sec.name, sec.name])
+        auxrow.append([sec.addr, "{0:#0{1}x}".format(sec.addr,10)])
         if sec.load_addr > 0:
-            row.append("{0:#0{1}x}".format(sec.load_addr,10))
+            auxrow.append([sec.load_addr, "{0:#0{1}x}".format(sec.load_addr,10)])
         else:
-            row.append("")
-        row.append(toKB(sec.size))
+            auxrow.append([0, ""])
+        auxrow.append([sec.size, toKB(sec.size)])
+
+        row = []
+        for aux in auxrow:
+            row.append(aux[0])
+            row.append(aux[1])
         return row
 
     def getMemRegionRow(self, r):
+        auxrow = []
+        auxrow.append([r.name, r.name])
+        auxrow.append([r.origin, "{0:#0{1}x}".format(r.origin,10)])
+        auxrow.append([r.end, "{0:#0{1}x}".format(r.end,10)])
+        auxrow.append([r.length, toKB(r.length)])
+        auxrow.append([r.length-r.using, toKB(r.length-r.using)])
+        auxrow.append([r.using, toKB(r.using)])
+        auxrow.append([(r.using/r.length)*100, '{:.2f}%'.format((r.using/r.length)*100)])
+        auxrow.append(['', ''])
         row = []
-        row.append(r.name)
-        row.append("{0:#0{1}x}".format(r.origin,10))
-        row.append("{0:#0{1}x}".format(r.end,10))
-        row.append(toKB(r.length))
-        row.append(toKB(r.length-r.using))
-        row.append(toKB(r.using))
-        row.append((r.using/r.length)*100)
-        row.append('')
-        row.append('{:.2f}%'.format((r.using/r.length)*100))
+        for aux in auxrow:
+            row.append(aux[0])
+            row.append(aux[1])
         return row
 
+    # def getMemRegionRow(self, r):
+    #     row = []
+    #     row.append(r.name)
+    #     row.append("{0:#0{1}x}".format(r.origin,10))
+    #     row.append("{0:#0{1}x}".format(r.end,10))
+    #     row.append(r.length)
+    #     row.append(toKB(r.length-r.using))
+    #     row.append(toKB(r.using))
+    #     row.append((r.using/r.length)*100)
+    #     row.append('')
+    #     row.append('{:.2f}%'.format((r.using/r.length)*100))
+    #     row.append(toKB(r.length))
+    #     return row
+
     def getRegionRow(self, r):
+        auxrow = []
+        auxrow.append([r.name, r.name])
+        auxrow.append([r.origin, "{0:#0{1}x}".format(r.origin,10)])
+        auxrow.append([0, ""])
+        auxrow.append([r.length, toKB(r.length)])
         row = []
-        row.append(r.name)
-        row.append("{0:#0{1}x}".format(r.origin,10))
-        row.append("")
-        row.append(toKB(r.length))
+        for aux in auxrow:
+            row.append(aux[0])
+            row.append(aux[1])
         return row
 
     def getSymbolRow(self, sec, sym):
-        row = []
-        row.append(sym.name)
-        row.append("{0:#0{1}x}".format(sym.addr,10))
+        auxrow = []
+        auxrow.append([sym.name, sym.name])
+        auxrow.append([sym.addr, "{0:#0{1}x}".format(sym.addr,10)])
         if sec.load_addr > 0:
             diff = (sym.addr - sec.addr)
             loadAddr = sec.load_addr + diff
-            row.append("{0:#0{1}x}".format(loadAddr,10))
+            auxrow.append([loadAddr, "{0:#0{1}x}".format(loadAddr,10)])
         else:
-            row.append("")
-        row.append(toKB(sym.size))
+            auxrow.append([0,""])
+        auxrow.append([sym.size, toKB(sym.size)])
+
+        row = []
+        for aux in auxrow:
+            row.append(aux[0])
+            row.append(aux[1])
+
         return row
 
     def getGtkTreeStore(self, search=None):
-        self.store = Gtk.TreeStore(str, str, str, str)
+        self.store = Gtk.TreeStore(
+            str, str,
+            int, str, 
+            int, str,
+            int, str)
         if not search:  
             for r in self.regions:
                 region_node = self.store.append(None, self.getRegionRow(r))
@@ -170,9 +206,18 @@ class GtkRegionsWin:
             return self.store
 
     def getGtkRegionsModel(self):
-        store = Gtk.ListStore(str, str, str, str, str, str, float, str, str)
+        store = Gtk.ListStore(
+            str, str,
+            int, str,
+            int, str,
+            int, str,
+            int, str, 
+            int, str,
+            float, str,
+            str, str)
         for r in self.regions:
             store.append(self.getMemRegionRow(r))
+        # store.set_sort_column_id(0, Gtk.SortType.ASCENDING)
         return store
 
     def show(self):
@@ -194,21 +239,23 @@ class GtkRegionsWin:
             renderer_editabletext = Gtk.CellRendererText()
             renderer_editabletext.set_property("editable", True)
             column_editabletext = Gtk.TreeViewColumn(
-                h, renderer_editabletext, text=idx
+                h, renderer_editabletext, text=idx+1
             )
+            column_editabletext.set_resizable(True)
+            column_editabletext.set_sort_column_id(idx)
             self.tvregios.append_column(column_editabletext)
-            idx+=1
+            idx+=2
 
         renderer_progress = Gtk.CellRendererProgress()
         renderer_progress.set_fixed_size(200,20)
         column_progress = Gtk.TreeViewColumn(
-            "Using", renderer_progress, value=idx, inverted=2, text=(idx+2)
+            "Using", renderer_progress, value=idx, inverted=1, text=(idx+1)
         )
         self.tvregios.append_column(column_progress)
-        idx+=1
+        idx+=2
 
         renderer_text = Gtk.CellRendererText()
-        column_text = Gtk.TreeViewColumn("", renderer_text, text=idx)
+        column_text = Gtk.TreeViewColumn("", renderer_text, text=idx+1)
         self.tvregios.append_column(column_text)
 
         self.tvregios.set_model(self.getGtkRegionsModel())
@@ -229,14 +276,17 @@ class GtkRegionsWin:
             renderer_editabletext = Gtk.CellRendererText()
             renderer_editabletext.set_property("editable", True)
             column_editabletext = Gtk.TreeViewColumn(
-                h, renderer_editabletext, text=idx
+                h, renderer_editabletext, text=idx+1
             )
+            column_editabletext.set_resizable(True)
+            column_editabletext.set_sort_column_id(idx)
             self.treeView.append_column(column_editabletext)
-            idx+=1
+            idx+=2
 
         entrySearch = builder.get_object("entrySearch")
         entrySearch.connect("changed", self.searchChanged)
         self.treeView.set_search_entry(entrySearch)
+
 
         self.treeView.set_model(self.getGtkTreeStore())
         self.treeView.expand_all()

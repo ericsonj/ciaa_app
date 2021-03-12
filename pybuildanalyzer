@@ -307,6 +307,7 @@ if args.all:
     for h in headers:
         renderer = Gtk.CellRendererText()
         column = Gtk.TreeViewColumn(h, renderer, text=idx)
+        column.set_resizable(True)
         treeView.append_column(column)
         idx+=1
 
