@@ -2,15 +2,15 @@ import os
 from os.path import basename
 from pymakelib import git
 from pymakelib import MKVARS
-from pymakelib import Toolchain as tool
-from pymakelib.Addon import Addon
+from pymakelib import toolchain as tool
+from pymakelib import addon
 from pymakelib.eclipse_addon import EclipseAddon
 from scripts import vscode_addon
-from pymakelib import D
+from pymakelib import Define as D
 
 # Add addons for Eclipse and vscode
-Addon(EclipseAddon)
-Addon(vscode_addon.vscode_init)
+addon.add(EclipseAddon)
+addon.add(vscode_addon.vscode_init)
 
 
 
