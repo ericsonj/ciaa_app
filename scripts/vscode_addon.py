@@ -15,6 +15,15 @@ def vscodeGen_c_cpp_properties(projSett, compSett):
         else:
             defines.append(str(d))
 
+
+    browse = []
+    
+    for inc in projSett['C_INCLUDES']:
+        i = Path(inc)
+        browse.append(str(i.parent))
+
+    browse = list(set(browse))  
+        
     # Change here
     c_cpp_properties = {
         "configurations": [
@@ -27,7 +36,7 @@ def vscodeGen_c_cpp_properties(projSett, compSett):
                 "cppStandard": "c++17",
                 "includePath": projSett['C_INCLUDES'],
                 "browse": {
-                    "path": projSett['C_INCLUDES'],
+                    "path": browse,
                     "limitSymbolsToIncludedHeaders": True,
                     "databaseFilename": "${workspaceFolder}/.vscode/browse.vc.db"
                 }
@@ -78,6 +87,7 @@ def vscodeGen_launch(projSett, compSett):
     fileout.write("// pymaketool: File autogenerate, see vscode_plugin.py\n")
     fileout.write(output)
     fileout.close()
+
 
 def vscode_init(projSett, compSett):
     # print(projSett) 

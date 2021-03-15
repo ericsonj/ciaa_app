@@ -23,6 +23,8 @@ extern "C" {
 
 /*==================[declaraciones de funciones externas]====================*/
 
+int main(void);
+
 /*==================[c++]====================================================*/
 #ifdef __cplusplus
 }

@@ -67,7 +67,7 @@ def getTargetsScript():
         'RESUME':   {
             'LOGKEY':   '>>',
             'FILE':     'RESUME',
-            'SCRIPT':   ['@./pybuildanalyzer', TARGET_MAP]
+            'SCRIPT':   ['@pybuildanalyzer2', MKVARS.TARGET]
         }
     }
 
