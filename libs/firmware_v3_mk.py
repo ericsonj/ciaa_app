@@ -1,4 +1,4 @@
-from pymakelib.Module import ModuleHandle
+from pymakelib import module
 from pathlib import Path
 
 FIRMWARE_V3 = '/PROJECTS/ARM/firmware_v3'
@@ -297,9 +297,9 @@ SAPI_0_6_2_INCS = [
         f"{FIRMWARE_V3}/libs/sapi/sapi_v0.6.2/external_peripherals/adc/adc128d818/inc",
     ]
 
-def getSrcs(mh: ModuleHandle):
+def getSrcs(mh: module.ModuleHandle):
     return SAPI_0_5_2_SRCS
 
 
-def getIncs(mh: ModuleHandle):
+def getIncs(mh: module.ModuleHandle):
     return list(filter(lambda f: Path(f).is_dir(), SAPI_0_5_2_INCS))

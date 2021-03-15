@@ -2,15 +2,15 @@ import os
 from os.path import basename
 from pymakelib import git
 from pymakelib import MKVARS
-from pymakelib import Toolchain as tool
-from pymakelib.Addon import Addon
+from pymakelib import toolchain as tool
+from pymakelib import addon
 from pymakelib.eclipse_addon import EclipseAddon
 from scripts import vscode_addon
-from pymakelib import D
+from pymakelib import Define as D
 
 # Add addons for Eclipse and vscode
-Addon(EclipseAddon)
-Addon(vscode_addon.vscode_init)
+addon.add(EclipseAddon)
+addon.add(vscode_addon.vscode_init)
 
 
 
@@ -57,7 +57,7 @@ def getTargetsScript():
         'TARGET_NM': {
             'LOGKEY':   'NM',
             'FILE':     TARGET_CSV,
-            'SCRIPT':   ['arm-none-eabi-nm', '-nAsSCp', MKVARS.TARGET, '>', TARGET_CSV]
+            'SCRIPT':   ['arm-none-eabi-nm', '-nAsSCpl', MKVARS.TARGET, '>', TARGET_CSV]
         },
         'TARGET_SIZE': {
             'LOGKEY':   'SIZE',
@@ -67,7 +67,7 @@ def getTargetsScript():
         'RESUME':   {
             'LOGKEY':   '>>',
             'FILE':     'RESUME',
-            'SCRIPT':   ['@pybuildanalyzer', TARGET_MAP]
+            'SCRIPT':   ['@pybuildanalyzer2', MKVARS.TARGET]
         }
     }
 

@@ -1,9 +1,6 @@
-from pymakelib.Module import ModuleHandle
+from pymakelib import module
 
 
-def getSrcs(m: ModuleHandle):
-    return m.getAllSrcsC()
-
-
-def getIncs(m: ModuleHandle):
-    return m.getAllIncsC()
+@module.ModuleClass
+class App(module.BasicCModule):
+    pass

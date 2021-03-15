@@ -1,14 +1,14 @@
-from pymakelib.Module import ModuleHandle, StaticLibrary
-from pymakelib.Toolchain import confARMeabiGCC
+from pymakelib import module
+from pymakelib.toolchain import confARMeabiGCC
 from pathlib import Path
 import subprocess
 
-def init(mh: ModuleHandle):
+def init(mh: module.ModuleHandle):
     """
     Create static library libarm_cortexM4lf_math.a
     """
     LIB_FOLDER_OUT = 'Release/ciaa_app/PROJECTS/ARM/firmware_v3/libs/lpc_open/lib'
-    staticLib = StaticLibrary(name='arm_cortexM4lf_math', outputDir=LIB_FOLDER_OUT)
+    staticLib = module.StaticLibrary(name='arm_cortexM4lf_math', outputDir=LIB_FOLDER_OUT)
     try:
         if mh.getGoal() == 'all':
             
@@ -25,3 +25,9 @@ def init(mh: ModuleHandle):
     except Exception as e:
             print(e)
     return staticLib
+
+def getSrcs(m):
+    return None
+
+def getIncs(m):
+    return None
