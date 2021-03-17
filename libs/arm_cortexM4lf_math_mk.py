@@ -1,13 +1,16 @@
+import subprocess
 from pymakelib import module
 from pymakelib.toolchain import confARMeabiGCC
 from pathlib import Path
-import subprocess
+from scripts import config
+
+LIBARM_CORTEXM4LF_MATH = config.FIRMWARE_V3_PATH + '/libs/cmsis_dsp/lib/libarm_cortexM4lf_math.hexlib'
+LIB_FOLDER_OUT = 'Release/ciaa_app/' + config.FIRMWARE_V3_PATH + '/libs/lpc_open/lib'
 
 def init(mh: module.ModuleHandle):
     """
     Create static library libarm_cortexM4lf_math.a
     """
-    LIB_FOLDER_OUT = 'Release/ciaa_app/PROJECTS/ARM/firmware_v3/libs/lpc_open/lib'
     staticLib = module.StaticLibrary(name='arm_cortexM4lf_math', outputDir=LIB_FOLDER_OUT)
     try:
         if mh.getGoal() == 'all':
@@ -19,8 +22,8 @@ def init(mh: module.ModuleHandle):
                 toolset['OBJCOPY'],
                 '-I', 'ihex',
                 '-O', 'binary',
-                '/PROJECTS/ARM/firmware_v3/libs/cmsis_dsp/lib/libarm_cortexM4lf_math.hexlib',
-                 LIB_FOLDER_OUT+'/libarm_cortexM4lf_math.a'])
+                LIBARM_CORTEXM4LF_MATH,
+                LIB_FOLDER_OUT + '/libarm_cortexM4lf_math.a'])
 
     except Exception as e:
             print(e)

@@ -7,6 +7,7 @@ from pymakelib import addon
 from pymakelib.eclipse_addon import EclipseAddon
 from scripts import vscode_addon
 from pymakelib import Define as D
+from scripts import config
 
 # Add addons for Eclipse and vscode
 addon.add(EclipseAddon)
@@ -132,8 +133,8 @@ def getCompilerOpts():
 def getLinkerOpts():
     return {
         'LINKER-SCRIPT': [
-            '-L/PROJECTS/ARM/firmware_v3/libs/lpc_open/lib',
-            '-T/PROJECTS/ARM/firmware_v3/libs/lpc_open/lib/link.ld'
+            f"-L{config.FIRMWARE_V3_PATH}/libs/lpc_open/lib",
+            f"-T{config.FIRMWARE_V3_PATH}/libs/lpc_open/lib/link.ld"
         ],
         'MACHINE-OPTS': [
             '-mcpu=cortex-m4',

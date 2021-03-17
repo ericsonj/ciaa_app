@@ -1,8 +1,9 @@
 import json
 import os
 from pathlib import Path
+from . import config
 
-GDB_PATH = "/opt/gcc-arm-none-eabi-8-2018-q4-major/bin/arm-none-eabi-gdb"
+GDB_PATH = config.GCC_GDB_PATH
 
 def vscodeGen_c_cpp_properties(projSett, compSett):
     """
@@ -70,9 +71,9 @@ def vscodeGen_launch(projSett, compSett):
             "servertype": "openocd",
             "cwd": "${workspaceRoot}",
             "runToMain": True,
-            "executable": "Release/ciaa_app/ciaa_app.elf",
+            "executable": outputFile,
             "configFiles": [
-                "/PROJECTS/ARM/firmware_v3/scripts/openocd/lpc4337_new.cfg"
+                config.FIRMWARE_V3_PATH + "/scripts/openocd/lpc4337_new.cfg"
             ],
             "gdbPath": GDB_PATH
         }
