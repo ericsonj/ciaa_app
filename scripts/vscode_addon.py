@@ -3,7 +3,7 @@ import os
 from pathlib import Path
 from . import config
 
-GDB_PATH = config.GCC_GDB_PATH
+GDB_PATH = config.ARM_NONE_EABI_PATH + '/arm-none-eabi-gdb'
 
 def vscodeGen_c_cpp_properties(projSett, compSett):
     """

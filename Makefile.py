@@ -76,8 +76,7 @@ def getTargetsScript():
 
 
 def getCompilerSet():
-    toolset = tool.confARMeabiGCC()
-    toolset['OBJDUMP'] = 'arm-none-eabi-objdump'
+    toolset = tool.confARMeabiGCC(binLocation=config.ARM_NONE_EABI_PATH)
     return toolset
 
 
